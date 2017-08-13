@@ -14,6 +14,10 @@ pytest-concurrent
     :target: https://ci.appveyor.com/project/reverbc/pytest-concurrent/branch/master
     :alt: See Build Status on AppVeyor
 
+.. image:: https://badges.gitter.im/pytest-concurrent/Lobby.svg
+   :alt: Join the chat at https://gitter.im/pytest-concurrent/Lobby
+   :target: https://gitter.im/pytest-concurrent/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+   
 Concurrently execute pytest testing with `multi-thread`, `multi-process` and `gevent`
 
 ----
@@ -82,7 +86,3 @@ If you encounter any problems, please `file an issue`_ along with a detailed des
 .. _`pip`: https://pypi.python.org/pypi/pip/
 .. _`PyPI`: https://pypi.python.org/pypi
 
-
-.. image:: https://badges.gitter.im/pytest-concurrent/Lobby.svg
-   :alt: Join the chat at https://gitter.im/pytest-concurrent/Lobby
-   :target: https://gitter.im/pytest-concurrent/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
