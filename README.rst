@@ -10,13 +10,13 @@ pytest-concurrent
     :target: https://travis-ci.org/reverbc/pytest-concurrent
     :alt: See Build Status on Travis CI
 
-.. image:: https://ci.appveyor.com/api/projects/status/github/reverbc/pytest-concurrent?branch=master
-    :target: https://ci.appveyor.com/project/reverbc/pytest-concurrent/branch/master
-    :alt: See Build Status on AppVeyor
-
 .. image:: https://badges.gitter.im/pytest-concurrent/Lobby.svg
    :alt: Join the chat at https://gitter.im/pytest-concurrent/Lobby
    :target: https://gitter.im/pytest-concurrent/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+   
+.. image:: https://ci.appveyor.com/api/projects/status/github/reverbc/pytest-concurrent?branch=master
+    :target: https://ci.appveyor.com/project/reverbc/pytest-concurrent/branch/master
+    :alt: See Build Status on AppVeyor
    
 Concurrently execute pytest testing with `multi-thread`, `multi-process` and `gevent`
 
