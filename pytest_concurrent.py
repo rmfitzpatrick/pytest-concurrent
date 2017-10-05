@@ -2,6 +2,7 @@
 import os
 import sys
 import time
+import logging
 import multiprocessing
 import concurrent.futures
 import collections
@@ -15,6 +16,10 @@ from _pytest.junitxml import Junit
 from _pytest.junitxml import _NodeReporter
 from _pytest.junitxml import bin_xml_escape
 from _pytest.junitxml import mangle_test_address
+
+
+log = logging.getLogger(__name__)
+log.setLevel('DEBUG')
 
 # Manager for the shared variables being used by in multiprocess mode
 MANAGER = multiprocessing.Manager()
@@ -42,6 +47,10 @@ STATS = MANAGER.dict()
 
 # ensures that STATS is not being modified simultaneously
 LOCK = multiprocessing.Lock()
+
+# Used for test synchronization
+MESSAGE_BOARD = MANAGER.dict()
+MESSAGE_BOARD_LOCK = MANAGER.Lock()
 
 
 def pytest_addoption(parser):
@@ -130,18 +139,26 @@ def pytest_runtestloop(session):
 
 def _run_items(mode, items, session, workers=None):
     ''' Multiprocess is not compatible with Windows !!! '''
+    log.debug('_run_items: {} {} {}'.format(mode, items, session))
     if mode == "mproc":
         '''Using ThreadPoolExecutor as managers to control the lifecycle of processes.
         Each thread will spawn a process and terminates when the process joins.
         '''
         def run_task_in_proc(item, index):
+            log.debug('run_task_in_proc creating process: {} {} {}'.format(session, item, index))
             proc = multiprocessing.Process(target=_run_next_item, args=(session, item, index))
             proc.start()
+            pid = proc.pid
+            log.debug('run_task_in_proc {} START: {} {} {}'.format(pid, session, item, index))
             proc.join()
+            log.debug('run_task_in_proc {} FINISH: {} {} {}'.format(pid, session, item, index))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             for index, item in enumerate(items):
+                log.debug('_run_items submitting: {} {}'.format(item, index))
                 executor.submit(run_task_in_proc, item, index)
+            log.debug('_run_items all items submitted to TPE')
+        log.debug('_run_items OUT OF TPE CM')
 
     elif mode == "mthread":
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
@@ -358,6 +375,16 @@ class ConcurrentTerminalReporter(TerminalReporter):
                 self._tw.write(word, **markup)
                 self._tw.write(" " + line)
                 self.currentfspath = -2
+
+
+@pytest.fixture(scope='session')
+def message_board():
+    return MESSAGE_BOARD
+
+
+@pytest.fixture(scope='session')
+def message_board_lock():
+    return MESSAGE_BOARD_LOCK
 
 
 def append_list(stats, cat, rep):
