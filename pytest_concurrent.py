@@ -146,7 +146,7 @@ def _run_items(mode, items, session, workers=None):
         Each thread will spawn a process and terminates when the process joins.
         '''
         proc_signal = MANAGER.Event()
-        poison_pill = MANAGER.Event()
+        reap_process_loop = MANAGER.Event()
 
         processes_lock = MANAGER.Lock()
         processes = collections.OrderedDict()
@@ -169,7 +169,7 @@ def _run_items(mode, items, session, workers=None):
                             processes[pid].join()
                             del processes[pid]
                             log.debug('reaper {} REAPED.'.format(pid))
-                if poison_pill.is_set() and len(processes) == 0:
+                if reap_process_loop.is_set() and len(processes) == 0:
                     log.debug('process_loop() exiting.')
                     return
                 if len(processes) < workers and not proc_signal.is_set():
@@ -180,19 +180,13 @@ def _run_items(mode, items, session, workers=None):
         proc_loop = threading.Thread(target=process_loop)
         proc_loop.start()
 
-        def get_item(items):
-            for item in items:
-                proc_signal.wait()
-                yield item
-
-        proc_signal.clear()
-        for index, item in enumerate(get_item(items)):
+        for index, item in enumerate(items):
             proc_signal.wait()
             proc_signal.clear()
             log.debug('_run_items submitting: {} {}'.format(item, index))
             submit_task_to_process(item, index)
 
-        poison_pill.set()
+        reap_process_loop.set()
         proc_loop.join()
 
 
