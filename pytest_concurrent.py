@@ -172,7 +172,7 @@ def _run_items(mode, items, session, workers=None):
                 if poison_pill.is_set() and len(processes) == 0:
                     log.debug('process_loop() exiting.')
                     return
-                if len(processes) < workers:
+                if len(processes) < workers and not proc_signal.is_set():
                     log.info('process_loop SETTING PROC SIGNAL')
                     proc_signal.set()
                 time.sleep(.001)
