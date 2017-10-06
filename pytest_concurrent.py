@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import logging
+import threading
 import multiprocessing
 import concurrent.futures
 import collections
@@ -144,21 +145,56 @@ def _run_items(mode, items, session, workers=None):
         '''Using ThreadPoolExecutor as managers to control the lifecycle of processes.
         Each thread will spawn a process and terminates when the process joins.
         '''
-        def run_task_in_proc(item, index):
-            log.debug('run_task_in_proc creating process: {} {} {}'.format(session, item, index))
+        proc_signal = MANAGER.Event()
+        poison_pill = MANAGER.Event()
+
+        processes_lock = MANAGER.Lock()
+        processes = collections.OrderedDict()
+
+        def submit_task_to_process(item, index):
+            log.debug('submit_task_to_process creating process: {} {} {}'.format(session, item, index))
             proc = multiprocessing.Process(target=_run_next_item, args=(session, item, index))
             proc.start()
             pid = proc.pid
-            log.debug('run_task_in_proc {} START: {} {} {}'.format(pid, session, item, index))
-            proc.join()
-            log.debug('run_task_in_proc {} FINISH: {} {} {}'.format(pid, session, item, index))
+            log.debug('submit_task_to_process {} START: {} {} {}'.format(pid, session, item, index))
+            with processes_lock:
+                processes[pid] = proc
+                log.debug('submit_task_to_process: {}'.format(str(processes)))
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            for index, item in enumerate(items):
-                log.debug('_run_items submitting: {} {}'.format(item, index))
-                executor.submit(run_task_in_proc, item, index)
-            log.debug('_run_items all items submitted to TPE')
-        log.debug('_run_items OUT OF TPE CM')
+        def process_loop():
+            while True:
+                with processes_lock:
+                    for pid in processes:
+                        if not processes[pid].is_alive():
+                            processes[pid].join()
+                            del processes[pid]
+                            log.debug('reaper {} REAPED.'.format(pid))
+                if poison_pill.is_set() and len(processes) == 0:
+                    log.debug('process_loop() exiting.')
+                    return
+                if len(processes) < workers:
+                    log.info('process_loop SETTING PROC SIGNAL')
+                    proc_signal.set()
+                time.sleep(.001)
+
+        proc_loop = threading.Thread(target=process_loop)
+        proc_loop.start()
+
+        def get_item(items):
+            for item in items:
+                proc_signal.wait()
+                yield item
+
+        proc_signal.clear()
+        for index, item in enumerate(get_item(items)):
+            proc_signal.wait()
+            proc_signal.clear()
+            log.debug('_run_items submitting: {} {}'.format(item, index))
+            submit_task_to_process(item, index)
+
+        poison_pill.set()
+        proc_loop.join()
+
 
     elif mode == "mthread":
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
