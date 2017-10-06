@@ -149,7 +149,7 @@ def _run_items(mode, items, session, workers=None):
         reap_process_loop = MANAGER.Event()
 
         processes_lock = MANAGER.Lock()
-        processes = collections.OrderedDict()
+        processes = MANAGER.dict()
 
         def submit_task_to_process(item, index):
             log.debug('submit_task_to_process creating process: {} {} {}'.format(session, item, index))
@@ -158,17 +158,23 @@ def _run_items(mode, items, session, workers=None):
             pid = proc.pid
             log.debug('submit_task_to_process {} START: {} {} {}'.format(pid, session, item, index))
             with processes_lock:
-                processes[pid] = proc
+                processes[pid] = True
                 log.debug('submit_task_to_process: {}'.format(str(processes)))
+
+        import psutil
 
         def process_loop():
             while True:
                 with processes_lock:
-                    for pid in processes:
-                        if not processes[pid].is_alive():
-                            processes[pid].join()
-                            del processes[pid]
-                            log.debug('reaper {} REAPED.'.format(pid))
+                    for pid in list(processes.keys()):
+                        try:
+                            proc = psutil.Process(pid)
+                            if proc.status() not in ('stopped', 'zombie'):
+                                continue
+                        except psutil.NoSuchProcess, e:
+                            log.exception(e)    
+                        del processes[pid]
+                        log.debug('reaper {} REAPED.'.format(pid))
                 if reap_process_loop.is_set() and len(processes) == 0:
                     log.debug('process_loop() exiting.')
                     return
@@ -177,7 +183,7 @@ def _run_items(mode, items, session, workers=None):
                     proc_signal.set()
                 time.sleep(.001)
 
-        proc_loop = threading.Thread(target=process_loop)
+        proc_loop = multiprocessing.Process(target=process_loop)
         proc_loop.start()
 
         for index, item in enumerate(items):
